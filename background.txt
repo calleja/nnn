@@ -1,0 +1,114 @@
+user: LuisC
+IAM User: 780917043311 IAM group: 
+pass: Snapper92_!
+Log on URL: https://780917043311.signin.aws.amazon.com/console
+key pair: LuisC-key-pair
+
+CONNECTION (through PuTTY)
+- Connection screen:
+- select "Proxy" 
+- select SOCKS 5
+- proxy hostname: bcpxy.nycnet
+- port: 1080
+- Username: calleja
+- Password: my finance password
+
+
+features of an EC2 instance
+Public IPv4 address
+Private IPv4 address
+Elastic IP address - disassociated from instance when it is stopped
+DNS hostnames - enabled by default
+security group
+Public IP - the instance automatically receives a publi IP address 
+Internet gateway
+
+instance types can control for CPU, memory, storage and networking capacity
+
+LOGIN information
+
+VPN
+VPC ID: vpc-03f5926b
+Subnet ID: subnet-41b6613b
+
+STORAGE
+Amazon Elastic Block Store
+
+CONNECT THRU LINUX:
+the pem key file will need to be secured via: 
+> sudo chmod 600 ./LuisC-key-pair.pem
+linux command build the ssh tunnel: 
+> ssh -i LuisC-key-pair.pem ubuntu@ec2-18-221-52-113.us-east-2.compute.amazonaws.com
+
+SECURITY
+security groups: firewall, protcol, ports... You must add rules to a security group that enable you to connect to your instance from your IP address using SSH. You can also add rules that allow inbound and outbound HTTP and HTTPS access from anywhere. 1 security group: 1 region
+private key is associated with a key pair
+
+ACCESS/DASHBOARDS
+Command line interface: http://docs.aws.amazon.com/cli/latest/userguide/cli-using-ec2.html
+Must ensure that the security group accepts traffic from my computer's IP address.
+Setting up new security rules: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/get-set-up-for-amazon-ec2.html
+KEY PAIRS: Private key (resource: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.htm): private keys are created independently of an instance, but are affiliated with an instance at launch time - this will automatically provide that private key with special user access (via default system user account) to the instance. This public key is actually stored in the filesystem of the instance's OS. The link between private key and instance is made at instance launch.
+can create a new key pair (public key to encrypt user ID data and a decrypting private key)  and subsequently a new private key.
+
+ADDING OTHER USERS TO THE INSTANCE
+Should you need to allow access to multiple users to an instance you can add user accounts to the instance (resource: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/managing-users.html). Each user will need to be provided with a dedicated private key. The public key information for each of these users will need to be added to a file on the instance directory: .ssh/authorized_keys
+Steps to add a user (add a user account) to an instance: log in to the ec2 instance and launch the shell.
+> sudo adduser newUser --disabled-password
+> sudo su - newUser (switch current user to the new user account)
+> mkdir .ssh
+> chmod 700 .ssh
+> touch .ssh/authorized_keys
+> chmod 600 .ssh/authorized_keys
+> vi .ssh/authorized_keys
+(paste the public key for the key pair)
+You can create a key pair for each user, and add the public key information from each key pair to the .ssh/authorized_keys file for each user on your instance. You can then distribute the private key files to your users. That way, you do not have to distribute the same private key file that's used for the root account to multiple users. 
+In order for additional users to access the account, their public keys will need to be added to the .ssh/authorized_keys file on the instance (use a text editor like vi to edit this file). I will need to create key pairs for each of the users and distribute them to the individuals. I can create a key pair by ...
+
+My IP ADDRESS
+161.185.160.90
+You'll need the public IPv4 address of your local computer. The security group editor in the Amazon EC2 console can automatically detect the public IPv4 address for you. Alternatively, you can use the search phrase "what is my IP address" in an Internet browser. If you are connecting through an Internet service provider (ISP) or from behind a firewall without a static IP address, you need to find out the range of IP addresses used by client computers. 
+Being behind a firewall, I likely do not have a static IP address, but instead have a range of IP addresses. I need to find out that range and how to specify it as a rule in the settings of the security group. Additionally, I need to ensure that the internal firewall accepts inbound and outbound traffic on port 22: the ports used by linux instances.
+
+
+EC2 Set up instructions:
+https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/get-set-up-for-amazon-ec2.html
+User Manual: https://docs.aws.amazon.com/console/ec2/launchinstance/status/user-guide
+Instance connection: https://docs.aws.amazon.com/console/ec2/instances/connect/docs
+
+LAUNCH AN EC2 INSTANCE
+http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/launching-instance.html
+
+CLEAN UP an instance:
+see step #3: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html#ec2-next-steps
+
+PuTTY: 
+PuTTY is a free SSH client for Windows
+download: https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html
+EC2: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/putty.html
+From my EC2 instance, need the Public DNS (IPv4): ec2-18-188-80-33.us-east-2.compute.amazonaws.com
+Pem key location: C:\Users\callejal\LuisC-key-pair.pem
+default user name for the AMI: ubuntu 16.04 LTS
+1) create a security key from the EC2 .pem file: use putty gen for this. Generate an RSA-type key, navigate over to the .pem file, then hit save.
+2) launch regular putty -> Session screen: Host Name: enter the host name for the particular AMI type ("ubuntu" for an ubuntu AMI) followed by '@' and the public DNS name of the instance. Ex. ubuntu@ec2-18-188-80-33.us-east-2.compute.amazonaws.com -> select SSH connection type -> ensure the port is equal to that of the instance -> navigate to Connection and input a "keep alive" interval.
+
+Install mongoDB (resource: https://docs.mongodb.com/manual/tutorial/install-mongodb-on-ubuntu/):
+a) import public key used by package mgmt system: sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2930ADAE8CAF5059EE73BB4B58712A2291FA4AD5
+
+b) echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/3.6 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-3.6.list
+
+e) install a specific release of mongodb
+
+Start a mongo shell in the instance:
+
+Connect my mongo client to the cloud:
+1) ensure the mongo service is started in the instance
+2) use the ec2 console to open the mongo port: 27017
+3) in a mongo client, like robo3t, plug in the public ip4 address of the instance and the 27017 port of mongod
+
+Next steps:
+a) https://hackernoon.com/basics-of-running-anything-on-aws-part-1-setup-running-logging-d3be42ab2094
+b) https://hackernoon.com/aws-ec2-part-4-starting-a-jupyter-ipython-notebook-server-on-aws-549d87a55ba9
+c) https://hackernoon.com/aws-ec2-part-3-installing-anaconda-on-ec2-linux-ubuntu-dbef0835818a
+d) https://hackernoon.com/8-great-tips-to-learn-aws-c4e1e0de4682
+e) https://hackernoon.com/basics-of-running-anything-on-aws-part-2-getting-the-task-done-ded74f202bf
