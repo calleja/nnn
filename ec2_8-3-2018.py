@@ -229,7 +229,7 @@ pd.crosstab(trunc_exp_cats['CATCH_ALL_EXP'],trunc_exp_cats['NETFLG']).apply(lamb
 #each of these variables will need to be stored on their own field bc there is a one:many relationship
 
 
-trunc_exp_cats.to_csv('/home/lechuza/Documents/aws/tripleNetLease/trunc_exp_cats',index=False)
+trunc_exp_cats.to_csv('/home/lechuza/Documents/aws/tripleNetLease/trunc_exp_cats.csv',index=False)
 
 trunc_exp_cats.to_csv('G:/Property/Luis_C/TripleNetLease/trunc_exp_cats.csv',index=False)
 
