@@ -75,6 +75,8 @@ c) no total expense and income
 bc1=re.compile('^(V|A|B|C|D|H|I|J|M|N|P|Q|T|U|W|Y|Z)')
 test=cut['IE_BC'].str.contains(bc1)
 cut1=cut[~test]  
+#major building class
+cut1['bc_maj']=cut1['IE_BC'].apply(lambda x: x[0])
 
 ''' MERGE the triple net lease determination and insert in the db '''
 #compare 2016 from "previousYrDetermination.csv" to "tripleNetLease_allValued_2016.csv" to confirm agreement - not observed; so ambiguous which dataset to accept as accurate
@@ -102,6 +104,9 @@ tots['lease_type','NETFLG']
 #default to newbase for now
 prev_16['bbl']=prev_16['BORO']*1000000000+prev_16['BLOCK']*1000+prev_16['LOT']
 allV['bbl']=allV['boro']*1000000000+allV['block']*1000+allV['lot']
+prev_17.filter(regex=r'SQFT',axis=)
+prev_17.dtypes
+
 
 
 
@@ -114,7 +119,7 @@ cut1['LOT']=cut1['LOT'].astype(np.int64)
 cut1[['BORO','BLOCK','LOT']].dtypes
 prev_17[['BORO','BLOCK','LOT']].dtypes
 cut1_w17=cut1.merge(prev_17,on=['BORO','BLOCK','LOT'])
-
+['SQFT']
 
 # merging revious (FY16/17) data and storing to a diff df, although should be another field of cut1_17
 cut1_16=cut1.merge(prev_16,on=['BORO','BLOCK','LOT'])
@@ -230,11 +235,17 @@ pd.crosstab(trunc_exp_cats['CATCH_ALL_EXP'],trunc_exp_cats['NETFLG']).apply(lamb
 
 
 trunc_exp_cats.to_csv('/home/lechuza/Documents/aws/tripleNetLease/trunc_exp_cats.csv',index=False)
-
+trunc_exp_cats=pd.read_csv('/home/lechuza/Documents/aws/tripleNetLease/trunc_exp_cats.csv')
 trunc_exp_cats.to_csv('G:/Property/Luis_C/TripleNetLease/trunc_exp_cats.csv',index=False)
-
+trunc_exp_cats.dtypes.to_csv('/home/lechuza/Documents/aws/tripleNetLease/dtypes_80.csv')
 
 '''STANDARDIZE all the continuous variables: own occupancy income, income psft, expense psft, expense ratio '''
+tgt=['exp_psft','inc_psft','S_RE_TOT_INC','F_RE_TOT_INC','S_TOT_EXP','COMSQFT','RESSQFT']
+trunc_exp_cats.loc[np.isinf(trunc_exp_cats['exp_psft']),tgt].head()
+
+g=(trunc_exp_cats['exp_psft']-np.nanmean(trunc_exp_cats['exp_psft']))/np.nanstd(trunc_exp_cats['exp_psft'])
+g.head()
+
 #apply a Robust Scalar to the training data... this scaling object will be applied to the test set... but will not be refit
 scaler_exp_ratio= preprocessing.RobustScaler()
 vals=train['exp_ratio'].values
