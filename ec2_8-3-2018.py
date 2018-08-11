@@ -242,6 +242,15 @@ trunc_exp_cats.dtypes.to_csv('/home/lechuza/Documents/aws/tripleNetLease/dtypes_
 '''STANDARDIZE all the continuous variables: own occupancy income, income psft, expense psft, expense ratio '''
 tgt=['exp_psft','inc_psft','S_RE_TOT_INC','F_RE_TOT_INC','S_TOT_EXP','COMSQFT','RESSQFT']
 trunc_exp_cats.loc[np.isinf(trunc_exp_cats['exp_psft']),tgt].head()
+#which bcs report 0.0 sqft... in order: G7, G6, K1 (big dropoff)
+trunc_exp_cats.loc[trunc_exp_cats['total_sqft']==0,'IE_BC'].value_counts()
+
+#option to merge the sqft from CAMA system, and perhaps cut down on 0 sqft properties
+cama1718=pd.read_csv('/home/lechuza/Documents/aws/tripleNetLease/cama1718_sqft.csv')
+cama1718.dtypes
+trunc_cama=cama1718[['boro','block','lot','rescomm','other_sqft']].merge(trunc_exp_cats,left_on=['boro','block','lot'],right_on=['BORO','BLOCK','LOT'],how='right')
+
+#create highest and best sqft field, and recalculate psft metrics off of it
 
 g=(trunc_exp_cats['exp_psft']-np.nanmean(trunc_exp_cats['exp_psft']))/np.nanstd(trunc_exp_cats['exp_psft'])
 g.head()
