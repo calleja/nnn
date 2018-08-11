@@ -32,6 +32,9 @@ path='G:/Property _CommercialModeling/SAS Data Sets/'
 best_15=pd.read_sas(path+'ie_re_best_filer15.sas7bdat')
 df15_c=best_15.copy()
 
+#option to merge the sqft from CAMA system, and perhaps cut down on 0 sqft properties
+cama1718=pd.read_csv('/home/lechuza/Documents/aws/tripleNetLease/cama1718_sqft.csv')
+
 #importing from EC2
 #defaults to port 27017
 client = pymongo.MongoClient("mongodb://luis:persyy@18.222.226.207:27017/rpie")    
@@ -104,11 +107,6 @@ tots['lease_type','NETFLG']
 #default to newbase for now
 prev_16['bbl']=prev_16['BORO']*1000000000+prev_16['BLOCK']*1000+prev_16['LOT']
 allV['bbl']=allV['boro']*1000000000+allV['block']*1000+allV['lot']
-prev_17.filter(regex=r'SQFT',axis=)
-prev_17.dtypes
-
-
-
 
 #MERGING NEWBASE to RPIE: extract total sqft and lease type fields - do this in R
 #cut1 merged with that fiscal year's data (effectively with the response variable attached)
@@ -126,9 +124,34 @@ cut1_16=cut1.merge(prev_16,on=['BORO','BLOCK','LOT'])
 ''' end the merge of NNN '''
     
 ''' CALCULATE CONTINUOUS VARIABLES '''
+#i) caclculate a highest and best sqft field from CAMA and newbase data
+any(trunc_cama[['rescomm','other_sqft','total_sqft']].apply(np.isinf,axis=0))
+#replace inf with 0
+trunc_cama[['rescomm','other_sqft','total_sqft']]=trunc_cama[['rescomm','other_sqft','total_sqft']].applymap(lambda x: 0 if np.isinf(x) or np.isnan(x) else x)
+trunc_cama[['rescomm','other_sqft','total_sqft']].head(100)
+
+trunc_cama[['rescomm','other_sqft','total_sqft']].dtypes
+trunc_cama['largest_sqft']=trunc_cama[['rescomm','other_sqft','total_sqft']].apply(lambda x: max(x), axis=1)
+
+
+trunc_cama['largest_sqft'].tail(20)
+trunc_cama[['rescomm','other_sqft','total_sqft']].tail(20)
+
+plt.close()
+fig, ax=plt.subplots(1,1)
+ax[0].plot.hist(trunc_cama['largest_sqft'])
+plt.show()
+
+plt.close()
+plt.hist(trunc_cama['largest_sqft'],bins=25)
+plt.show()
+
+
+
 # 1) EXPENSE psft
 cut1_w17['total_sqft']=cut1_w17['RESSQFT']+cut1_w17['COMSQFT']
 cut1_w17['exp_psft']=cut1_w17['F_TOT_EXP']/cut1_w17['total_sqft']
+
 
 # 2) INCOME psft
 cut1_w17['inc_psft']=cut1_w17['F_RE_TOT_INC']/cut1_w17['total_sqft']
@@ -245,14 +268,18 @@ trunc_exp_cats.loc[np.isinf(trunc_exp_cats['exp_psft']),tgt].head()
 #which bcs report 0.0 sqft... in order: G7, G6, K1 (big dropoff)
 trunc_exp_cats.loc[trunc_exp_cats['total_sqft']==0,'IE_BC'].value_counts()
 
-#option to merge the sqft from CAMA system, and perhaps cut down on 0 sqft properties
-cama1718=pd.read_csv('/home/lechuza/Documents/aws/tripleNetLease/cama1718_sqft.csv')
-cama1718.dtypes
+#oddly enough, we lose ~ 10,218 upon this merge
 trunc_cama=cama1718[['boro','block','lot','rescomm','other_sqft']].merge(trunc_exp_cats,left_on=['boro','block','lot'],right_on=['BORO','BLOCK','LOT'],how='right')
+#inspect those that fell out
+trunc_cama.loc[trunc_cama['rescomm'].isnull(),['BORO','BLOCK','LOT','IE_BC']].head(10)
+
+cama1718.loc[(cama1718['boro']== 1) & (cama1718['block']==29) & (cama1718['lot']==25),:]
+#prominent BC left out: K1, S9, K4, K2, E9
+trunc_cama.loc[trunc_cama['rescomm'].isnull(),'IE_BC'].value_counts()
 
 #create highest and best sqft field, and recalculate psft metrics off of it
 
-g=(trunc_exp_cats['exp_psft']-np.nanmean(trunc_exp_cats['exp_psft']))/np.nanstd(trunc_exp_cats['exp_psft'])
+g=(trunc_cama['exp_psft']-np.nanmean(trunc_exp_cats['exp_psft']))/np.nanstd(trunc_exp_cats['exp_psft'])
 g.head()
 
 #apply a Robust Scalar to the training data... this scaling object will be applied to the test set... but will not be refit
