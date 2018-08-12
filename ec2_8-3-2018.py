@@ -38,7 +38,7 @@ cama1718=pd.read_csv('/home/lechuza/Documents/aws/tripleNetLease/cama1718_sqft.c
 
 #oddly enough, we lose ~ 10,218 upon this merge
 trunc_cama=cama1718[['boro','block','lot','rescomm','other_sqft']].merge(trunc_exp_cats,left_on=['boro','block','lot'],right_on=['BORO','BLOCK','LOT'],how='right')
-#inspect those that fell out
+#inspect those properties that failed to match to CAMA extract
 trunc_cama.loc[trunc_cama['rescomm'].isnull(),['BORO','BLOCK','LOT','IE_BC']].head(10)
 
 #importing from EC2
@@ -134,9 +134,7 @@ cut1_16=cut1.merge(prev_16,on=['BORO','BLOCK','LOT'])
 any(trunc_cama[['rescomm','other_sqft','total_sqft']].apply(np.isinf,axis=0))
 #replace inf with 0
 trunc_cama[['rescomm','other_sqft','total_sqft']]=trunc_cama[['rescomm','other_sqft','total_sqft']].applymap(lambda x: 0 if np.isinf(x) or np.isnan(x) else x)
-trunc_cama[['rescomm','other_sqft','total_sqft']].head(100)
-
-trunc_cama[['rescomm','other_sqft','total_sqft']].dtypes
+#select and impute the largest sqft value from the three options
 trunc_cama['largest_sqft']=trunc_cama[['rescomm','other_sqft','total_sqft']].apply(lambda x: max(x), axis=1)
 
 #mostly G7 and G6 - I should throw these building classes out
@@ -146,11 +144,7 @@ trunc_camat_sqft=trunc_cama.loc[trunc_cama['largest_sqft']>0,:]
 
 plt.close()
 fig, ax=plt.subplots(1,1)
-ax[0].plot.hist(trunc_cama['largest_sqft'])
-plt.show()
-
-plt.close()
-plt.hist(trunc_cama['largest_sqft'],bins=25)
+ax.hist(trunc_cama['largest_sqft'],bins=25)
 plt.show()
 
 
@@ -166,9 +160,9 @@ trunc_camat_sqft=trunc_camat_sqft.loc[trunc_camat_sqft['exp_psft']<np.percentile
 
 # 3) Calculating expense ratio... will be standardized via a robust scalar
 #impute a '1' should the filer report 0 income
-cut1_w17.loc[cut1_w17['F_RE_TOT_INC']==0.0,'F_RE_TOT_INC']=1
+trunc_camat_sqft.loc[cut1_w17['F_RE_TOT_INC']==0.0,'F_RE_TOT_INC']=1
 #calculate expense ratio
-cut1_w17['exp_ratio']=cut1_w17['F_TOT_EXP']/cut1_w17['F_RE_TOT_INC']
+trunc_camat_sqft['exp_ratio']=trunc_camat_sqft['F_TOT_EXP']/trunc_camat_sqft['F_RE_TOT_INC']
 
 ''' visualize expense ratio on this dataset
 plt.hist(cut1['exp_ratio'],bins=25)
@@ -180,15 +174,15 @@ np.percentile(cut1['exp_ratio'].values,[25,50,75,95,98])
 #13,110 will be established as the upper bound
 '''
 
-ninetyeight=np.percentile(cut1_w17['exp_ratio'].values,[98])[0]
-trunc=cut1_w17.loc[cut1_w17['exp_ratio']<ninetyeight,:]
+ninetyeight=np.percentile(trunc_camat_sqft['exp_ratio'].values,[98])[0]
+trunc=trunc_camat_sqft.loc[trunc_camat_sqft['exp_ratio']<ninetyeight,:]
 
 # 4) OWNER occupied income... ratio: owner occupied income / total income
 trunc_camat_sqft['own_occ_ratio']=trunc_camat_sqft['OWN_OCC_INC']/trunc_camat_sqft['F_RE_TOT_INC']
 #impute 0 should value be None
 trunc_camat_sqft.loc[pd.isnull(trunc_camat_sqft['own_occ_ratio']),'own_occ_ratio']=0
 
-#quality check the ratio... it looks fine, with outliers in an acceptable range
+#quality check the ratio... it looks fine, with outliers in an acceptable range... and no values >1
 plt.hist(trunc_camat_sqft['own_occ_ratio'],bins=25)
 plt.show()
 
@@ -218,7 +212,7 @@ dob=pd.read_sas('G:/Property_ORGPROJ/Orgproj/AnalyticsGrp/tom/scr/adhoc_06192018
 '''  end import categorical variable: previous year determination '''
 
 
-''' import previous year categorizations '''
+''' import previous year categorizations - HOLD OFF FOR FIRST ITERATION '''
 cats=pd.read_csv('G:/Property/Luis_C/TripleNetLease/RPIE_cama_datasets/nnn_classification_201617.csv',skiprows=1, header=None,names=['pid','Boro','Block','Lot','filing','lease','tc','bc','sqft'])
 cats.describe()
 cats.dtypes
@@ -237,6 +231,7 @@ If the “lessee” is filing the RPIE, then we should see all of their operatin
 
 I think it is crucial to consider who the filer is and how they answer the lease type questions and then what expenses are filed; from there we can determine what lease type we are working with.'''
 
+''' refactor expense categories and cretate a catch all '''
 trunc.filter(regex=r'EXP',axis=1).dtypes
 #these will be isolated... all others not in this list, will be rolled up
 exp=['LEAS1_EXP', 'LEAS2_TEN_IMP_EXP', 'MANAG_EXP','INSUR_EXP'] 
@@ -264,6 +259,7 @@ trunc_exp_cats=pd.concat([trunc,exp_cats_bools],axis=1)
 pd.crosstab(trunc_exp_cats['CATCH_ALL_EXP'],trunc_exp_cats['NETFLG']).apply(lambda r: r/r.sum(), axis=1)
 #each of these variables will need to be stored on their own field bc there is a one:many relationship
 
+''' END refactoring expense categories '''
 
 trunc_exp_cats.to_csv('/home/lechuza/Documents/aws/tripleNetLease/trunc_exp_cats.csv',index=False)
 trunc_exp_cats=pd.read_csv('/home/lechuza/Documents/aws/tripleNetLease/trunc_exp_cats.csv')
@@ -272,11 +268,9 @@ trunc_exp_cats.dtypes.to_csv('/home/lechuza/Documents/aws/tripleNetLease/dtypes_
 
 ''' Split data into a test and training... use sklearn's random splitting function '''
 train,test_real=model_selection.train_test_split(trunc_camat_sqft,test_size=0.3)
-#currently missing the dependent variable: the determination by assessors of the lease type
-
 ''' end split the data '''
 
-''' now that the datasets have been splt STANDARDIZE all the continuous variables: own occupancy income, income psft, expense psft, expense ratio '''
+''' now that the datasets have been split, STANDARDIZE all the continuous variables: own occupancy income, income psft, expense psft, expense ratio* *not on first iteration '''
 
 #calculate a z-score... if that doesn't fare well, resort to robust scaling
 def z_score(ser):
@@ -287,20 +281,18 @@ train['exp_psft_z']=z_score(train['exp_psft'])
 train['inc_psft_z']=z_score(train['inc_psft'])
 train['own_occ_ratio_z']=z_score(train['own_occ_ratio'])
 
+# visualize distribution of z-scores
 plt.close()
 fig, ax = plt.subplots(1)
-ax.hist(trunc_camat_sqft['inc_psft_z'],bins=30,density=0)
+ax.hist(train['inc_psft_z'],bins=30,density=0)
 plt.show()
 
 # a qq plot... the outliers are crazy
 ax1=plt.subplot(111)
-stats.probplot(test, plot=plt)
+stats.probplot(train['inc_psft_z'], plot=plt)
 plt.show()
 
-#quantiles
-np.percentile(test,[20,30,50,75,90,96])
-np.percentile(trunc_camat_sqft['inc_psft'],[20,30,50,75,90,95,97,98,99,100])
-
+#ROBUST SCALING
 #apply a Robust Scalar to the training data... this scaling object will be applied to the test set... but will not be refit
 scaler_exp_ratio= preprocessing.RobustScaler()
 vals=trunc_camat_sqft['exp_psft'].values
@@ -326,7 +318,31 @@ robust_scaled_series_own=scaler_own_occ.fit_transform(vals_r)
 plt.hist(robust_scaled_series_own,bins=25)
 plt.show()
 
-#apply the z-score/Robust Scalar object to the TEST (test_real) data
+'''Apply the z-score/Robust Scalar object to the TEST (test_real) data '''
+#a z-score function using parameters from the test dataset
+def z_score_onTest(test,train):
+    g=(test-np.nanmean(train))/np.nanstd(train)
+    return g
+
+test_real['exp_psft_z']=z_score_onTest(test_real['exp_psft'],train['exp_psft'])
+test_real['inc_psft_z']=z_score_onTest(test_real['inc_psft'],train['inc_psft'])
+test_real['own_occ_ratio_z']=z_score_onTest(test_real['own_occ_ratio'],train['own_occ_ratio'])
+
+#distribution is odd bc so many 0s (don't report any own occupied)
+fig,ax= plt.subplots(1)
+ax.hist(test_real['own_occ_ratio_z'],bins=25)
+plt.show()
+
+fig,ax= plt.subplots(1)
+ax.hist(test_real['inc_psft_z'],bins=25)
+plt.show()
+
+min(test_real['own_occ_ratio_z'])
+np.percentile(test_real['inc_psft_z'],[25,50,75,90,95,98,100])
+test_real['own_occ_ratio_z'].head(25)
+
+
+#Robust Scaling
 vals_test=test['exp_ratio'].values
 vals_tr=vals_test.reshape(len(vals_test),1)
 ma=scaler_exp_ratio.transform(vals_tr)
@@ -340,6 +356,8 @@ re_scaledt=ma.reshape(len(vals_tr))
 sert=pd.Series(re_scaledt)
 
 #export dataset then analyze in R
+test_real.to_csv('/home/lechuza/Documents/aws/tripleNetLease/test_real_dataset.csv',index=False)
+train.to_csv('/home/lechuza/Documents/aws/tripleNetLease/train_dataset.csv',index=False)
 
 ''' modeling: 
     a) sklearn.linear_model.LogisticRegression
